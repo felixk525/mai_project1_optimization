@@ -3,9 +3,12 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from datetime import datetime as dt
+from tqdm.notebook import tqdm
 
 from .dataset import *
-
+args = {
+    "fp16" : True
+}
 
 class Trainer(nn.Module):
     """Class for model training.
@@ -59,23 +62,41 @@ class Trainer(nn.Module):
         """
         model = self.model.to(self.device)
         self._optimizer_to(self.optimizer, self.device)
+        if args["fp16"]:
+            scaler = torch.amp.GradScaler()
+            for epoch in tqdm(range(epochs)):
+                model.train()
+                for i, (data, target) in enumerate(dataloader):
+                    self.optimizer.zero_grad()
+                    x = data.to(self.device)
+                    y = target.to(self.device)
+                    
+                    with torch.amp.autocast(device_type="cuda"):
+                        x = model(x)
 
-        for epoch in range(epochs):
-            model.train()
-            for i, (data, target) in enumerate(dataloader):
-                self.optimizer.zero_grad()
-                x = data.to(self.device)
-                y = target.to(self.device)
+                    loss = self.loss_fn(x, y)
+                    scaler.scale(loss).backward()
+                    scaler.step(self.optimizer)
+                    scaler.update()
+                    if silent:
+                        print(f"Epoch {epoch + 1:>3}/{epochs}, Batch {i + 1:>4}/{len(dataloader)}, Loss {loss.item():.016f}", end="\n")
+                yield model
+        else:
+            for epoch in tqdm(range(epochs)):
+                model.train()
+                for i, (data, target) in enumerate(dataloader):
+                    self.optimizer.zero_grad()
+                    x = data.to(self.device)
+                    y = target.to(self.device)
+                    
+                    x = model(x)
 
-                x = model(x)
-
-                loss = self.loss_fn(x, y)
-                loss.backward()
-                self.optimizer.step()
-
-                if not silent:
-                    print(f"Epoch {epoch + 1:>3}/{epochs}, Batch {i + 1:>4}/{len(dataloader)}, Loss {loss.item():.016f}", end="\r")
-            yield model
+                    loss = self.loss_fn(x, y)
+                    loss.backward()
+                    self.optimizer.step()
+                    if silent:
+                        print(f"Epoch {epoch + 1:>3}/{epochs}, Batch {i + 1:>4}/{len(dataloader)}, Loss {loss.item():.016f}", end="\n")
+                yield model
 
     def _optimizer_to(self, optim: torch.optim.Optimizer, device: torch.device) -> None:
         """Moves the optimizer's state to the specified device.
