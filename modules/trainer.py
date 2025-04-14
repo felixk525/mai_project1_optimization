@@ -7,7 +7,8 @@ from tqdm.notebook import tqdm
 
 from .dataset import *
 args = {
-    "fp16" : True
+    "fp16" : False,
+    "profiler" : True
 }
 
 class Trainer(nn.Module):
@@ -38,7 +39,7 @@ class Trainer(nn.Module):
         self.loss_fn = loss_fn
         self.device = device
 
-    def train(self, dataloader: DataLoader, *, epochs: int = 100, silent: bool = False) -> None:
+    def train(self, dataloader: DataLoader, *, epochs: int = 100) -> None:
         """Trains the model for a specified number of epochs.
 
         Args:
@@ -46,10 +47,10 @@ class Trainer(nn.Module):
             epochs (int, optional): Number of training epochs. Defaults to 100.
             silent (bool, optional): If True, suppresses printing loss during training. Defaults to False.
         """
-        for _ in self.train_iter(dataloader, epochs=epochs, silent=silent):
+        for _ in self.train_iter(dataloader, epochs=epochs):
             pass
 
-    def train_iter(self, dataloader: DataLoader, *, epochs: int = 100, silent: bool = False) -> Iterator[nn.Module]:
+    def train_iter(self, dataloader: DataLoader, *, epochs: int = 100) -> Iterator[nn.Module]:
         """Trains the model for a specified number of epochs and yields the model after each epoch.
 
         Args:
@@ -62,41 +63,51 @@ class Trainer(nn.Module):
         """
         model = self.model.to(self.device)
         self._optimizer_to(self.optimizer, self.device)
+
         if args["fp16"]:
             scaler = torch.amp.GradScaler()
-            for epoch in tqdm(range(epochs)):
-                model.train()
-                for i, (data, target) in enumerate(dataloader):
-                    self.optimizer.zero_grad()
-                    x = data.to(self.device)
-                    y = target.to(self.device)
-                    
+        
+        if args["profiler"]:
+            prof = torch.profiler.profile(
+            activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+            schedule=torch.profiler.schedule(wait=0, warmup=3, active=100, repeat=1),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler('./log/trainer_profile'),
+            # record_shapes=True,
+            # profile_memory=True,
+            # with_stack=True,
+            # with_flops=True,
+            # with_modules=True
+            )
+            prof.start()
+        
+        for epoch in tqdm(range(epochs)):
+            model.train()
+            for i, (data, target) in enumerate(dataloader):
+                self.optimizer.zero_grad()
+                x = data.to(self.device)
+                y = target.to(self.device)
+                
+                if args["fp16"]:
                     with torch.amp.autocast(device_type="cuda"):
                         x = model(x)
+                else:
+                    x = model(x)
 
-                    loss = self.loss_fn(x, y)
+                loss = self.loss_fn(x, y)
+
+                if args["fp16"]:
                     scaler.scale(loss).backward()
                     scaler.step(self.optimizer)
                     scaler.update()
-                    if silent:
-                        print(f"Epoch {epoch + 1:>3}/{epochs}, Batch {i + 1:>4}/{len(dataloader)}, Loss {loss.item():.016f}", end="\n")
-                yield model
-        else:
-            for epoch in tqdm(range(epochs)):
-                model.train()
-                for i, (data, target) in enumerate(dataloader):
-                    self.optimizer.zero_grad()
-                    x = data.to(self.device)
-                    y = target.to(self.device)
-                    
-                    x = model(x)
-
-                    loss = self.loss_fn(x, y)
+                else:
                     loss.backward()
                     self.optimizer.step()
-                    if silent:
-                        print(f"Epoch {epoch + 1:>3}/{epochs}, Batch {i + 1:>4}/{len(dataloader)}, Loss {loss.item():.016f}", end="\n")
-                yield model
+                if args["profiler"]:
+                    prof.step()
+            yield model
+        
+        if args["profiler"]:
+            prof.stop()
 
     def _optimizer_to(self, optim: torch.optim.Optimizer, device: torch.device) -> None:
         """Moves the optimizer's state to the specified device.

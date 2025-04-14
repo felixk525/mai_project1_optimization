@@ -41,8 +41,7 @@ class InferenceSession(nn.Module):
     """
     def __init__(self, model:nn.Module, *, batch_size:int=128, device:torch.device = "cuda" if torch.cuda.is_available() else "cpu", pin_memory:torch.device = "cuda" if torch.cuda.is_available() else "cpu") -> None:
         super().__init__()
-        self.model = model.to(device)
-        self.model.eval()
+        self.model = model
         self.device = device
         self.pin_memory = pin_memory
         self.batch_size = batch_size
@@ -63,6 +62,9 @@ class InferenceSession(nn.Module):
             torch.Tensor: The result of the model's forward pass, moved to the specified device if pin_memory is True.
         """
         args = [arg.to(self.device) if isinstance(arg, torch.Tensor) else arg for arg in args]
+
+        self.model = self.model.to(self.device)
+        self.model.eval()
         
         with torch.no_grad():
             if len(args[0]) > self.batch_size:
