@@ -8,7 +8,9 @@ from tqdm.notebook import tqdm
 from .dataset import *
 args = {
     "fp16" : False,
-    "profiler" : True
+    "profiler" : True,
+    "gradAcc" : True,
+    "gradAccIter": 4
 }
 
 class Trainer(nn.Module):
@@ -72,8 +74,8 @@ class Trainer(nn.Module):
             activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
             schedule=torch.profiler.schedule(wait=0, warmup=3, active=100, repeat=1),
             on_trace_ready=torch.profiler.tensorboard_trace_handler('./log/trainer_profile'),
-            # record_shapes=True,
-            # profile_memory=True,
+            record_shapes=True,
+            profile_memory=True,
             # with_stack=True,
             # with_flops=True,
             # with_modules=True
@@ -92,13 +94,20 @@ class Trainer(nn.Module):
                         x = model(x)
                 else:
                     x = model(x)
-
-                loss = self.loss_fn(x, y)
+                if args["gradAcc"]:
+                    loss = self.loss_fn(x,y)/args["gradAccIter"]
+                else:
+                    loss = self.loss_fn(x, y)
 
                 if args["fp16"]:
                     scaler.scale(loss).backward()
                     scaler.step(self.optimizer)
                     scaler.update()
+                if args["gradAcc"]:
+                    loss.backward()
+                    if ((i + 1) % args["gradAccIter"] == 0) or (i + 1 == len(dataloader)):
+                        self.optimizer.step()
+                        self.optimizer.zero_grad()
                 else:
                     loss.backward()
                     self.optimizer.step()
