@@ -7,7 +7,7 @@ from tqdm.notebook import tqdm
 
 from .dataset import *
 args = {
-    "fp16" : False,
+    "fp16" : True,
     "profiler" : True,
     "gradAcc" : True,
     "gradAccIter": 4
@@ -99,18 +99,26 @@ class Trainer(nn.Module):
                 else:
                     loss = self.loss_fn(x, y)
 
-                if args["fp16"]:
-                    scaler.scale(loss).backward()
-                    scaler.step(self.optimizer)
-                    scaler.update()
                 if args["gradAcc"]:
-                    loss.backward()
-                    if ((i + 1) % args["gradAccIter"] == 0) or (i + 1 == len(dataloader)):
-                        self.optimizer.step()
-                        self.optimizer.zero_grad()
+                    if args["fp16"]:
+                        scaler.scale(loss).backward()
+                        if ((i + 1) % args["gradAccIter"] == 0) or (i + 1 == len(dataloader)):
+                            scaler.step(self.optimizer)
+                            scaler.update()
+                            self.optimizer.zero_grad()
+                    else:
+                        loss.backward()
+                        if ((i + 1) % args["gradAccIter"] == 0) or (i + 1 == len(dataloader)):
+                            self.optimizer.step()
+                            self.optimizer.zero_grad()
                 else:
-                    loss.backward()
-                    self.optimizer.step()
+                    if args["fp16"]:
+                        scaler.scale(loss).backward()
+                        scaler.step(self.optimizer)
+                        scaler.update()
+                    else:
+                        loss.backward()
+                        self.optimizer.step()
                 if args["profiler"]:
                     prof.step()
             yield model
