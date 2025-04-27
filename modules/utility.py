@@ -15,7 +15,7 @@ from torchmetrics.classification import (
     MulticlassStatScores,
 )
 from datetime import datetime
-
+import torch.nn.utils.prune as prune
 
 
 
@@ -27,6 +27,15 @@ def ISO_time() -> str:
     """
     return datetime.now().isoformat()
 
+
+def apply_pruning(model, amount):
+    """
+    Applies L1 unstructured pruning to the convolutional layers of the model.
+    """
+    for name, module in model.named_modules():
+        if isinstance(module, torch.nn.Conv2d) and "classifier" not in name:
+            prune.l1_unstructured(module, name="weight", amount=amount)
+    return model
 
 
 class InferenceSession(nn.Module):
