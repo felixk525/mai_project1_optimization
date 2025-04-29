@@ -41,7 +41,7 @@ class Trainer(nn.Module):
         self.loss_fn = loss_fn
         self.device = device
 
-    def train(self, dataloader: DataLoader, *, epochs: int = 100) -> None:
+    def train(self, dataloader: DataLoader, *, epochs: int = 100, silent: bool = False) -> None:
         """Trains the model for a specified number of epochs.
 
         Args:
@@ -49,10 +49,10 @@ class Trainer(nn.Module):
             epochs (int, optional): Number of training epochs. Defaults to 100.
             silent (bool, optional): If True, suppresses printing loss during training. Defaults to False.
         """
-        for _ in self.train_iter(dataloader, epochs=epochs):
+        for _ in self.train_iter(dataloader, epochs=epochs, silent=silent):
             pass
 
-    def train_iter(self, dataloader: DataLoader, *, epochs: int = 100) -> Iterator[nn.Module]:
+    def train_iter(self, dataloader: DataLoader, *, epochs: int = 100, silent: bool = False) -> Iterator[nn.Module]:
         """Trains the model for a specified number of epochs and yields the model after each epoch.
 
         Args:
@@ -121,6 +121,7 @@ class Trainer(nn.Module):
                         self.optimizer.step()
                 if args["profiler"]:
                     prof.step()
+                    
             yield model
         
         if args["profiler"]:
