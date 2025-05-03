@@ -1,4 +1,6 @@
 import torch
+import io
+import time
 from typing import *
 import plotly.graph_objs as go
 import plotly.express as px
@@ -27,7 +29,43 @@ def ISO_time() -> str:
     """
     return datetime.now().isoformat()
 
+def get_model_size_mb(model) -> float:
+    buffer = io.BytesIO()
+    torch.save(model.state_dict(), buffer)
+    size_mb = buffer.tell() / 1e6
+    buffer.close()
+    return size_mb
 
+def evaluate_time_acc_model(model, dataloader, device): # Evaluator for quantized and baseline. Redundancy? 
+    model.to(device)
+
+    # Eval is not supported by the quantized model. No idea why
+    if hasattr(model, "eval"):
+        try:
+            model.eval()
+        except NotImplementedError:
+            pass
+
+    correct = 0
+    total = 0
+    start_time = time.time()
+
+    with torch.no_grad():
+        for images, labels in dataloader:
+            images = images.to(device)
+            labels = labels.to(device)
+
+            output = model(images)
+
+            _, predicted = torch.max(output.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    end_time = time.time()
+    accuracy = correct / total
+    elapsed_time = end_time - start_time
+
+    return accuracy, elapsed_time
 
 class InferenceSession(nn.Module):
     """
