@@ -28,7 +28,7 @@ def run_optuna(model,
         bs         = trial.suggest_categorical("BS_SUGGEST", [16, 32, 64, 128])
         lr         = trial.suggest_float("LR_SUGGEST", 1e-6, 1e-2, log=True)
         #max_epochs = trial.suggest_int("EPOCHS", 5, 40) (For 3D computing -> More computing timing)
-        max_epochs = trial.suggest_int("EPOCHS", 25, 25) #(Fixed to 25 due to fast computing and better Accuracy)
+        max_epochs = trial.suggest_int("EPOCHS", 25, 25) #(Fixed to 25 (Optional 20) due to fast computing and better Accuracy)
 
         train_dl = DataLoader(train_subset, batch_size=bs, shuffle=True)
         val_dl   = DataLoader(val_subset,   batch_size=bs, shuffle=False)
