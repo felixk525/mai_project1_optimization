@@ -21,13 +21,14 @@ def run_optuna(model,
                TrainerClass,
                *,
                n_trials: int = 50,
-               seed: int = 1):
+               seed: int = 42):
     initial_model = copy.deepcopy(model)
 
     def objective(trial):
-        bs         = trial.suggest_categorical("BS_SUGGEST", [16, 32, 64, 128, 256])
+        bs         = trial.suggest_categorical("BS_SUGGEST", [16, 32, 64, 128])
         lr         = trial.suggest_float("LR_SUGGEST", 1e-6, 1e-2, log=True)
-        max_epochs = trial.suggest_int("EPOCHS", 5, 40)
+        #max_epochs = trial.suggest_int("EPOCHS", 5, 40) (For 3D computing -> More computing timing)
+        max_epochs = trial.suggest_int("EPOCHS", 25, 25) #(Fixed to 25 (Optional 20) due to fast computing and better Accuracy)
 
         train_dl = DataLoader(train_subset, batch_size=bs, shuffle=True)
         val_dl   = DataLoader(val_subset,   batch_size=bs, shuffle=False)
@@ -53,14 +54,14 @@ def run_optuna(model,
             else:
                 no_improve += 1
 
-            if no_improve >= 2:
+            if no_improve >= 6:
                 raise TrialPruned()
 
         trial.set_user_attr("best_model_state", best_state)
         return best_acc
 
     sampler = optuna.samplers.TPESampler(seed=seed)
-    pruner  = optuna.pruners.MedianPruner(n_warmup_steps=2)
+    pruner  = optuna.pruners.MedianPruner(n_warmup_steps=3)
     study   = optuna.create_study(
         direction="maximize",
         sampler=sampler,
