@@ -5,6 +5,8 @@ from typing import *
 import plotly.graph_objs as go
 import plotly.express as px
 from torch import nn
+from torch.profiler import profile, record_function, ProfilerActivity
+from torch.utils.tensorboard import SummaryWriter
 from IPython.display import clear_output, display
 from ipywidgets import BoundedIntText
 from torchmetrics.classification import (
@@ -36,7 +38,7 @@ def get_model_size_mb(model) -> float:
     buffer.close()
     return size_mb
 
-def evaluate_time_acc_model(model, dataloader, device): # Evaluator for quantized and baseline. Redundancy? 
+def evaluate_time_acc_model(model, dataloader, device, profile_model=False, log_dir="runs/profiler"):
     model.to(device)
 
     # Eval is not supported by the quantized model. No idea why
@@ -50,22 +52,50 @@ def evaluate_time_acc_model(model, dataloader, device): # Evaluator for quantize
     total = 0
     start_time = time.time()
 
-    with torch.no_grad():
-        for images, labels in dataloader:
-            images = images.to(device)
-            labels = labels.to(device)
+    if profile_model:
+        with profile(
+            schedule=torch.profiler.schedule(wait=5, warmup=5, active=10, repeat=1),
+            activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+            on_trace_ready=torch.profiler.tensorboard_trace_handler(log_dir),
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=True
+        ) as prof:
 
-            output = model(images)
+            with torch.no_grad():
+                for i, (images, labels) in enumerate(dataloader):
+                    images = images.to(device)
+                    labels = labels.to(device)
 
-            _, predicted = torch.max(output.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+                    output = model(images)
+                    if isinstance(output, (tuple, list)):
+                        output = output[0]
+                    _, predicted = torch.max(output.data, 1)
+                    total += labels.size(0)
+                    correct += (predicted == labels).sum().item()
+
+                    prof.step()
+                    if i >= 20:  # profile only a few batches
+                        break
+    else:
+        with torch.no_grad():
+            for images, labels in dataloader:
+                images = images.to(device)
+                labels = labels.to(device)
+
+                output = model(images)
+                if isinstance(output, (tuple, list)):
+                    output = output[0]
+                _, predicted = torch.max(output.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
 
     end_time = time.time()
     accuracy = correct / total
     elapsed_time = end_time - start_time
 
     return accuracy, elapsed_time
+
 
 class InferenceSession(nn.Module):
     """
