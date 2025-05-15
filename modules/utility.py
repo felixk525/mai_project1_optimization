@@ -5,8 +5,7 @@ from typing import *
 import plotly.graph_objs as go
 import plotly.express as px
 from torch import nn
-from torch.profiler import profile, record_function, ProfilerActivity
-from torch.utils.tensorboard import SummaryWriter
+from torch.profiler import profile, ProfilerActivity
 from IPython.display import clear_output, display
 from ipywidgets import BoundedIntText
 from torchmetrics.classification import (
