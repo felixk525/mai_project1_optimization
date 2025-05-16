@@ -114,8 +114,7 @@ class Trainer(nn.Module):
                         loss.backward()
                         self.optimizer.step()
                 if args["profiler"] and prof:
-                    if i < 5:
-                        prof.step()
+                    prof.step()
             yield model
         
         if args["profiler"] and prof:
