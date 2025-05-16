@@ -8,7 +8,7 @@ from tqdm.notebook import tqdm
 from .dataset import *
 args = {
     "fp16" : True,
-    "profiler" : True,
+    "profiler" : False,
     "gradAcc" : True,
     "gradAccIter": 4
 }
@@ -41,12 +41,18 @@ class Trainer(nn.Module):
         self.loss_fn = loss_fn
         self.device = device
 
-    def train(self, dataloader: DataLoader, *, epochs: int = 100, profiler_config: dict | None = None) -> None:
-        for _ in self.train_iter(dataloader, epochs=epochs, profiler_config=profiler_config):
+    def train(self, dataloader: DataLoader, *, epochs: int = 100) -> None:
+        """Trains the model for a specified number of epochs.
+
+        Args:
+            dataloader (DataLoader): DataLoader providing input data and targets.
+            epochs (int, optional): Number of training epochs. Defaults to 100.
+            silent (bool, optional): If True, suppresses printing loss during training. Defaults to False.
+        """
+        for _ in self.train_iter(dataloader, epochs=epochs):
             pass
 
-
-    def train_iter(self, dataloader: DataLoader, *, epochs: int = 100, profiler_config: dict | None = None) -> Iterator[nn.Module]:
+    def train_iter(self, dataloader: DataLoader, *, epochs: int = 100) -> Iterator[nn.Module]:
         """Trains the model for a specified number of epochs and yields the model after each epoch.
 
         Args:
@@ -63,18 +69,18 @@ class Trainer(nn.Module):
         if args["fp16"]:
             scaler = torch.amp.GradScaler()
         
-        prof = None
-        if args.get("profiler") and profiler_config:
+        if args["profiler"]:
             prof = torch.profiler.profile(
-                activities=profiler_config.get("activities", [torch.profiler.ProfilerActivity.CPU]),
-                schedule=profiler_config.get("schedule", torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=1)),
-                on_trace_ready=torch.profiler.tensorboard_trace_handler(profiler_config.get("log_dir", './log/trainer_profile')),
-                record_shapes=profiler_config.get("record_shapes", True),
-                profile_memory=profiler_config.get("profile_memory", True),
-                with_stack=profiler_config.get("with_stack", False)
+            activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+            schedule=torch.profiler.schedule(wait=5, warmup=5, active=10, repeat=1),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler('./log/trainer_profile'),
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=True,
+            # with_flops=True,
+            # with_modules=True
             )
             prof.start()
-
         
         for epoch in tqdm(range(epochs)):
             model.train()
@@ -113,11 +119,12 @@ class Trainer(nn.Module):
                     else:
                         loss.backward()
                         self.optimizer.step()
-                if args["profiler"] and prof:
-                    prof.step()
+                if args["profiler"]:
+                    if i < 20: # Tuned for set sizes
+                        prof.step()
             yield model
         
-        if args["profiler"] and prof:
+        if args["profiler"]:
             prof.stop()
 
     def _optimizer_to(self, optim: torch.optim.Optimizer, device: torch.device) -> None:
