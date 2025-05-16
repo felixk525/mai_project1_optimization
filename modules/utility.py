@@ -74,10 +74,6 @@ def evaluate_time_acc_model(model, dataloader, device, profile_model=False, log_
                     correct += (predicted == labels).sum().item()
                     prof.step()
                     
-                    if i < 20:  # profile only a few batches
-                        prof.step() #break
-                    # elif i == 20:
-                    #     prof.stop()
     else:
         with torch.no_grad():
             for images, labels in dataloader:
