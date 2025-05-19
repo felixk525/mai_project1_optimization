@@ -54,7 +54,7 @@ def run_optuna(model,
             else:
                 no_improve += 1
 
-            if no_improve >= 6:
+            if no_improve >= 7:
                 raise TrialPruned()
 
         trial.set_user_attr("best_model_state", best_state)
@@ -72,3 +72,8 @@ def run_optuna(model,
     best_params      = study.best_params
     best_model_state = study.best_trial.user_attrs["best_model_state"]
     return best_params, best_model_state, study
+
+'''Best Accuracy achieved with OPTUNA_MO with 12 Trials, EPOCH =25,
+   BS_SUGGEST : 32 and LR_SUGGEST: 1.6141462555811457e-05 (Range e-05 to e-02) 
+   is 0.9134788513183594 that us 91.35 %'''
+
