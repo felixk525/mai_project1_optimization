@@ -9,7 +9,7 @@ from tqdm.notebook import tqdm
 from .dataset import *
 args = {
     "fp16" : False,
-    "profiler" : False,
+    "profiler" : True,
     "gradAcc" : False,
     "gradAccIter": 4,
     "lr_scheduling" : False,
