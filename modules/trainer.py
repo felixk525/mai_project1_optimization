@@ -12,7 +12,7 @@ args = {
     "profiler" : False,
     "gradAcc" : False,
     "gradAccIter": 4,
-    "lr_scheduler" : False,
+    "lr_scheduling" : False,
 }
 
 class Trainer(nn.Module):
