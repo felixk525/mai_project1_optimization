@@ -82,9 +82,9 @@ class Trainer(nn.Module):
             on_trace_ready=torch.profiler.tensorboard_trace_handler('./log/trainer_profile'),
             record_shapes=True,
             profile_memory=True,
-            # with_stack=True,
-            # with_flops=True,
-            # with_modules=True
+            with_stack=True,
+            with_flops=True,
+            with_modules=True
             )
             prof.start()
         
