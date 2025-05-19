@@ -8,11 +8,11 @@ from tqdm.notebook import tqdm
 
 from .dataset import *
 args = {
-    "fp16" : True,
-    "profiler" : True,
-    "gradAcc" : True,
+    "fp16" : False,
+    "profiler" : False,
+    "gradAcc" : False,
     "gradAccIter": 4,
-    "lr_scheduler" : True,
+    "lr_scheduler" : False,
 }
 
 class Trainer(nn.Module):
