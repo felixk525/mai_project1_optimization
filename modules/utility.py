@@ -1,6 +1,4 @@
 import torch
-import io
-import time
 from typing import *
 import plotly.graph_objs as go
 import plotly.express as px
@@ -17,7 +15,7 @@ from torchmetrics.classification import (
     MulticlassStatScores,
 )
 from datetime import datetime
-
+import torch.nn.utils.prune as prune
 
 
 
@@ -28,6 +26,16 @@ def ISO_time() -> str:
         str: Current time in ISO 8601 format.
     """
     return datetime.now().isoformat()
+
+
+def apply_pruning(model, amount):
+    """
+    Applies L1 unstructured pruning to the convolutional layers of the model.
+    """
+    for name, module in model.named_modules():
+        if isinstance(module, torch.nn.Conv2d) and "classifier" not in name:
+            prune.l1_unstructured(module, name="weight", amount=amount)
+    return model
 
 
 class InferenceSession(nn.Module):
