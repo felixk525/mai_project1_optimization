@@ -70,7 +70,7 @@ class Trainer(nn.Module):
 
         scheduler = None
         if args["lr_scheduling"]:
-            scheduler = lr_scheduler.StepLR(self.optimizer, step_size=10, gamma=0.1)
+            scheduler = lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=10)
 
         if args["fp16"]:
             scaler = torch.amp.GradScaler()
